@@ -200,6 +200,9 @@ int32_t Generator::ComputeCutoffFrequency(int16_t pitch, int16_t smoothness) {
   if (frequency < 0) {
     frequency = 0;
   }
+  if (frequency > 65535) {
+    frequency = 65535;
+  }
   return frequency;
 }
 
