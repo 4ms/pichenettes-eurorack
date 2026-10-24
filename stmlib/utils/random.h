@@ -30,22 +30,30 @@
 #define STMLIB_UTILS_RANDOM_H_
 
 #include "stmlib/stmlib.h"
+#include <atomic>
 
 namespace stmlib {
 
 class Random {
  public:
-  static inline uint32_t state() { return rng_state_; }
+  static inline uint32_t state() {
+    return rng_state_.load(std::memory_order_relaxed);
+  }
 
   static inline void Seed(uint32_t seed) {
-    rng_state_ = seed;
+    rng_state_.store(seed, std::memory_order_relaxed);
   }
 
   static inline uint32_t GetWord() {
-    rng_state_ = rng_state_ * 1664525L + 1013904223L;
-    return state();
+    uint32_t previous = rng_state_.load(std::memory_order_relaxed);
+    uint32_t next;
+    do {
+      next = previous * 1664525u + 1013904223u;
+    } while (!rng_state_.compare_exchange_weak(
+        previous, next, std::memory_order_relaxed));
+    return next;
   }
-  
+
   static inline int16_t GetSample() {
     return static_cast<int16_t>(GetWord() >> 16);
   }
@@ -55,7 +63,9 @@ class Random {
   }
 
  private:
-  static uint32_t rng_state_;
+  static std::atomic<uint32_t> rng_state_;
+  static_assert(std::atomic<uint32_t>::is_always_lock_free,
+                "Audio RNG must be lock-free");
 
   DISALLOW_COPY_AND_ASSIGN(Random);
 };
